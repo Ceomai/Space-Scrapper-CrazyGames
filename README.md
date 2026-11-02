@@ -12,7 +12,7 @@ Pure HTML5 canvas + JavaScript. No framework, no build step, no external assets 
 - **Tehlikeler:** patlayıcı tanklar, ısıran taklitçi kutular, parlayan denizanaları. Kara kutulardan para, torpido, süre, güçlü vinç ya da kristal çıkar.
 - **Dükkân (seviye arası):** torpido ve tek seviyelik destekler: kanca yağı, enerji içeceği, zaman kapsülü, şans yoncası, mücevher cilası, radar.
 - **Garaj (kalıcı):** her turdan kazanılan parçalarla 6 yükseltme: kanca motoru, vinç, mıknatıs, oksijen tankı, torpido rafı, tarayıcı.
-- **Diller:** İngilizce; Türkçe tarayıcıda Türkçe açılır, menüden değiştirilir.
+- **Dil:** yalnızca İngilizce (tarayıcı dili ne olursa olsun); tarayıcının otomatik çevirisi kapalı.
 - **Kontroller:** dokun / tıkla / Boşluk / ↓ = kancayı at; Torpido düğmesi / ↑ / T = çekilen yükü patlat; Esc / P = duraklat.
 
 ## CrazyGames integration (SDK v3)
@@ -53,7 +53,7 @@ node tests/run.js
 
 | File | What it checks |
 |---|---|
-| `tests/flow.js` | All screens with a mocked CrazyGames SDK: loading and gameplay events, midgame ad timing, three rewarded ads, ad failure, data-module save and reload, mute setting, no external requests or links, no-SDK mode, Turkish UI, layout on 7 screen sizes (overflow, tap targets ≥ 36 px, playfield fills the screen) |
+| `tests/flow.js` | All screens with a mocked CrazyGames SDK: loading and gameplay events, midgame ad timing, three rewarded ads, ad failure, data-module save and reload, mute setting, no external requests or links, no-SDK mode, English-only check (Turkish and German browsers, every screen, all 10 field conditions, every box/event/item text drawn on the canvas), layout on 7 screen sizes (overflow, tap targets ≥ 36 px, playfield fills the screen) |
 | `tests/balance.js` | Balance bot plays whole runs (perfect or human-like aim) with 0 / mid / max garage, portrait and landscape |
 
 Measured with the human-like bot (3 runs each): no garage ≈ level 8, mid garage ≈ level 10, full garage ≈ level 12; portrait and landscape within ±1 level. Filling the whole garage takes ≈ 12 runs.

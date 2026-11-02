@@ -17,6 +17,7 @@ const MOCK = () => {
   } };
 };
 let failed = 0; const report = [];
+const SS_TEXT_CHECK = keys => Object.fromEntries(keys.map(k => [k, 1]));
 const check = (ok, name, info = '') => { if (!ok) failed++; report.push(`${ok ? '✓' : '✗'} ${name}${info ? ' · ' + info : ''}`); };
 const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (win) { g.earned = g.target; SS.Game.run.cash += g.target; SS.Game.run.total += g.target; } g.time = .01; SS.Game.manual = true; for (let i = 0; i < 80 && SS.Game.state === 'play'; i++) SS.Game._step(1 / 30); SS.Game.manual = false; return SS.Game.state; }, win);
 
@@ -100,22 +101,64 @@ const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (w
     check(!errs.length, 'Sayfa hatası yok', errs.slice(0, 3).join(' | '));
     await ctx.close();
   }
-  /* 2. SDK yokken (yerel önizleme, reklam engelleyici) */
-  {
-    const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, locale: 'tr-TR' }); const p = await ctx.newPage();
+  /* 2. SDK yokken (yerel önizleme, reklam engelleyici) ve yabancı dilde tarayıcı: oyun her zaman İngilizce */
+  for (const locale of ['tr-TR', 'de-DE']) {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, locale }); const p = await ctx.newPage();
     const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.route(/crazygames\.com/, r => r.abort());
     await p.goto(URL); await p.waitForTimeout(400);
-    check(await p.evaluate(() => SS.meta.lang === 'tr' && document.querySelector('[data-act=play]').textContent === 'Oyna'), 'Türkçe tarayıcıda Türkçe arayüz');
-    await p.screenshot({ path: path.join(OUT, 'menu-portrait-tr.png') });
-    await p.click('.screen:not([hidden]) [data-act=play]'); await p.waitForTimeout(2600);
-    await p.screenshot({ path: path.join(OUT, 'play-portrait-tr.png') });
-    await endLevel(p, true); await p.click('.screen:not([hidden]) [data-act=double]'); await p.waitForTimeout(150);
-    check(await p.evaluate(() => SS.Game.state === 'clear'), 'SDK yokken reklam düğmesi oyunu kilitlemiyor');
-    await p.click('.screen:not([hidden]) [data-act=toShop]'); await p.click('.screen:not([hidden]) [data-act=next]'); await p.waitForTimeout(200);
-    check(await p.evaluate(() => SS.Game.state === 'play' && SS.Game.run.level === 2), 'SDK yokken seviye geçişi');
-    await p.evaluate(() => SS.ACT.lang());
-    check(!errs.length, 'SDK yokken sayfa hatası yok', errs.slice(0, 3).join(' | '));
+    const ui = await p.evaluate(() => ({ play: document.querySelector('#menu [data-act=play]').textContent, lang: document.documentElement.lang, tr: document.documentElement.getAttribute('translate'), langBtn: !!document.querySelector('[data-act=lang]') }));
+    check(ui.play === 'Play' && ui.lang === 'en' && ui.tr === 'no' && !ui.langBtn, `${locale} tarayıcıda oyun İngilizce, otomatik çeviri kapalı, dil düğmesi yok`, JSON.stringify(ui));
+    if (locale === 'tr-TR') {
+      await p.screenshot({ path: path.join(OUT, 'menu-portrait.png') });
+      await p.click('.screen:not([hidden]) [data-act=play]'); await p.waitForTimeout(2600);
+      await p.screenshot({ path: path.join(OUT, 'play-portrait.png') });
+      await endLevel(p, true); await p.click('.screen:not([hidden]) [data-act=double]'); await p.waitForTimeout(150);
+      check(await p.evaluate(() => SS.Game.state === 'clear'), 'SDK yokken reklam düğmesi oyunu kilitlemiyor');
+      await p.click('.screen:not([hidden]) [data-act=toShop]'); await p.click('.screen:not([hidden]) [data-act=next]'); await p.waitForTimeout(200);
+      check(await p.evaluate(() => SS.Game.state === 'play' && SS.Game.run.level === 2), 'SDK yokken seviye geçişi');
+    }
+    check(!errs.length, `${locale}: sayfa hatası yok`, errs.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+  /* 2b. Dil denetimi: bütün ekranlar, 10 saha koşulu, bütün kutu ve olay mesajları, tuvale çizilen her yazı */
+  {
+    const ctx = await b.newContext({ viewport: { width: 1000, height: 562 }, locale: 'tr-TR' }); const p = await ctx.newPage();
+    const errs = []; p.on('pageerror', e => errs.push(e.message));
+    await p.route(/crazygames\.com/, r => r.abort());
+    await p.addInitScript(() => { window.__canvasText = new Set(); const f = CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText = function (t, ...a) { window.__canvasText.add(String(t)); return f.call(this, t, ...a); }; });
+    await p.goto(URL); await p.waitForTimeout(300);
+    const texts = new Set(); const grab = async () => (await p.evaluate(() => [...document.querySelectorAll('body *')].filter(e => e.offsetParent !== null && e.children.length === 0).map(e => e.textContent.trim()).filter(Boolean))).forEach(t => texts.add(t));
+    await grab(); await p.evaluate(() => SS.ACT.garage()); await grab();
+    // her saha koşulunu bir seviyede oynat: yazılar tuvale çizilsin, kutu ve olaylar tetiklensin
+    const variants = await p.evaluate(() => SS.VARIANTS.map(v => v.id));
+    await p.evaluate(() => SS.ACT.play());
+    for (const vid of variants) {
+      await p.evaluate(vid => {
+        const g = SS.Game._dbg(); g.V = SS.VARIANTS.find(v => v.id === vid); g.intro = 3.3; SS.Game.manual = true;
+        for (let i = 0; i < 40; i++) SS.Game._step(1 / 30);
+      }, vid);
+      await p.waitForTimeout(60); await grab();
+    }
+    await p.evaluate(() => {
+      // bütün kutu sonuçları ve olay mesajları
+      const g = SS.Game._dbg(), t = SS.TEXT.en;
+      for (const k of Object.keys(t.boxes)) SS.FX.text(g.fx, 10, 10, t.boxes[k]); for (const k of Object.keys(t.events)) SS.FX.text(g.fx, 10, 10, t.events[k]);
+      for (const k of Object.keys(t.items)) SS.FX.text(g.fx, 10, 10, '+1', null, t.items[k]);
+      SS.Game.manual = true; SS.Game._step(1 / 60);
+    });
+    await p.waitForTimeout(80); await grab();
+    await endLevel(p, true); await grab(); await p.click('.screen:not([hidden]) [data-act=toShop]'); await grab();
+    await p.evaluate(() => { SS.Game.run.offers = ['torp', 'oil', 'strength', 'time', 'clover', 'polish', 'radar'].map(id => ({ id, price: 1, bought: false })); SS.ACT.toShop(); SS.Game.run.offers = ['torp', 'oil', 'strength', 'time', 'clover', 'polish', 'radar'].map(id => ({ id, price: 1, bought: false })); });
+    await p.evaluate(() => { document.getElementById('shop').innerHTML = ''; }); await p.evaluate(() => SS.ACT.next()); await p.waitForTimeout(100);
+    await p.evaluate(() => SS.ACT.pause()); await grab(); await p.evaluate(() => SS.ACT.resume());
+    await endLevel(p, false); await grab(); await p.click('.screen:not([hidden]) [data-act=endRun]'); await grab();
+    const all = [...texts, ...await p.evaluate(() => [...window.__canvasText]), ...await p.evaluate(() => JSON.stringify(SS.TEXT).match(/"([^"\\]|\\.)*"/g).map(s => JSON.parse(s)))];
+    const TR_CHARS = /[çğıöşüÇĞİÖŞÜ]/, TR_WORDS = /\b(ve|bir|için|seviye|hurda|kanca|torpido|oyna|garaj|devam|reklam|süre|para|parça|bölge|kota)\b/i;
+    const bad = [...new Set(all)].filter(s => TR_CHARS.test(s) || TR_WORDS.test(s));
+    check(!bad.length && all.length > 150, `Bütün metinler İngilizce (${new Set(all).size} farklı metin tarandı: ekranlar, 10 saha koşulu, kutular, olaylar, eşyalar, dükkân, garaj)`, bad.slice(0, 6).join(' | '));
+    check(!('tr' in SS_TEXT_CHECK(await p.evaluate(() => Object.keys(SS.TEXT)))), 'Oyunda yalnızca İngilizce metin seti var');
+    check(!errs.length, 'Dil denetiminde sayfa hatası yok', errs.slice(0, 3).join(' | '));
     await ctx.close();
   }
   /* 3. Ekran boyutları: taşma ve dokunma alanı */

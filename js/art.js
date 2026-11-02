@@ -72,7 +72,7 @@ Art.paintAll = root => {
   });
 };
 
-/* ---------- arka plan ---------- */
+/* ---------- background ---------- */
 Art.makeStars = (n, W, H) => Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * H, r: Math.random() < .15 ? 1.6 : .9, tw: Math.random() * 6 }));
 Art.space = (c, W, H, t, zone, stars, P) => {
   const g = c.createLinearGradient(0, 0, 0, H);
@@ -102,7 +102,7 @@ Art.space = (c, W, H, t, zone, stars, P) => {
   }
 };
 
-/* ---------- gemi ve kaptan ---------- */
+/* ---------- ship ---------- */
 // Kademeli gemiler: 1 = Gezgin Martı (beyaz, kanatlı), 2 = Demir Balina (iri, lacivert)
 function shipTier(c, x, y, s, t, P, opts, tier) {
   c.save(); c.translate(x, y); c.scale(s, s);
@@ -166,7 +166,7 @@ Art.claw = (c, x, y, ang, open, P) => {
   c.restore();
 };
 
-/* ---------- eşyalar ---------- */
+/* ---------- items ---------- */
 function poly(c, pts) { c.beginPath(); pts.forEach(([a, b], i) => i ? c.lineTo(a, b) : c.moveTo(a, b)); c.closePath(); }
 function nut(c, x, y, r, P) {
   c.fillStyle = P.metal; c.beginPath();

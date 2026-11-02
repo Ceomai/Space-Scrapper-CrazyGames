@@ -13,20 +13,20 @@ const UPS = [
   { id: 'claw', cost: [20, 45, 80, 130, 200] }, { id: 'winch', cost: [20, 45, 80, 130, 200] }, { id: 'magnet', cost: [25, 55, 95, 150, 220] },
   { id: 'time', cost: [30, 65, 110, 170, 250] }, { id: 'torp', cost: [40, 90, 160] }, { id: 'luck', cost: [30, 70, 130] },
 ];
-const defMeta = () => ({ v: 1, best: 0, bestLevel: 0, parts: 0, runs: 0, up: { claw: 0, winch: 0, magnet: 0, time: 0, torp: 0, luck: 0 }, muted: false, lang: null, tut: false });
+const defMeta = () => ({ v: 1, best: 0, bestLevel: 0, parts: 0, runs: 0, up: { claw: 0, winch: 0, magnet: 0, time: 0, torp: 0, luck: 0 }, muted: false, tut: false });
 const meta = SS.meta = defMeta();
 const loadMeta = () => {
   const m = PL.load();
   if (m && typeof m === 'object') {
     for (const k of ['best', 'bestLevel', 'parts', 'runs']) if (Number.isFinite(m[k]) && m[k] >= 0) meta[k] = Math.floor(m[k]);
     if (m.up && typeof m.up === 'object') for (const u of UPS) if (Number.isFinite(m.up[u.id])) meta.up[u.id] = clamp(Math.floor(m.up[u.id]), 0, u.cost.length);
-    meta.muted = m.muted === true; meta.tut = m.tut === true; if (m.lang === 'en' || m.lang === 'tr') meta.lang = m.lang;
+    meta.muted = m.muted === true; meta.tut = m.tut === true;
   }
-  if (!meta.lang) meta.lang = /^tr\b/i.test(navigator.language || '') ? 'tr' : 'en';
 };
 const saveMeta = () => PL.save(meta);
-const T = () => SS.TEXT[meta.lang] || SS.TEXT.en;
-const money = n => Math.round(n).toLocaleString(meta.lang === 'tr' ? 'tr-TR' : 'en-US');
+// The CrazyGames edition is English only, whatever the browser language is
+const T = () => SS.TEXT.en;
+const money = n => Math.round(n).toLocaleString('en-US');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* =====================================================================
@@ -369,7 +369,7 @@ function renderMenu() {
   $('menu').innerHTML = `<div class="logo"><canvas id="logoCv" width="300" height="150"></canvas><h1>Space<span>Scrapper</span></h1></div>
     <div class="col">${btn(t.play, 'play', 'primary big')}${btn(`${t.garage} · ${meta.parts} ⚙`, 'garage')}</div>
     <p class="stats">${meta.best ? `${t.best}: ${money(meta.best)} · ${t.lv(meta.bestLevel)}` : t.tapHint}</p>
-    <div class="row small">${btn(`${t.sound}: ${meta.muted ? t.off : t.on}`, 'mute', 'ghost')}${btn(meta.lang === 'tr' ? 'English' : 'Türkçe', 'lang', 'ghost')}</div>`;
+    <div class="row small">${btn(`${t.sound}: ${meta.muted ? t.off : t.on}`, 'mute', 'ghost')}</div>`;
   show('menu'); drawLogo();
 }
 function drawLogo() {
@@ -431,7 +431,6 @@ const ACT = {
   garage: () => renderGarage(),
   menu: () => renderMenu(),
   mute: () => { meta.muted = !meta.muted; saveMeta(); state === 'play' ? renderPause() : renderMenu(); },
-  lang: () => { meta.lang = meta.lang === 'tr' ? 'en' : 'tr'; saveMeta(); document.documentElement.lang = meta.lang; renderMenu(); },
   up: d => { const u = UPS.find(x => x.id === d.id); if (!u) return; const lv = meta.up[u.id], cost = u.cost[lv]; if (lv >= u.cost.length || meta.parts < cost) return; meta.parts -= cost; meta.up[u.id]++; saveMeta(); SS.sfx('coin'); renderGarage(); },
   double: async () => { const g = G; if (R.doubled === g.lv) return; const ok = await PL.ad('rewarded'); if (ok) { R.doubled = g.lv; R.cash += g.earned; R.total += g.earned; g.earned *= 2; SS.sfx('big'); } else toast(T().adFail); renderClear(); },
   toShop: () => goShop(),
@@ -491,7 +490,7 @@ SS.boot = async () => {
   PL.loadingStart && PL.loadingStart();
   await PL.init();
   PL.loadingStart();
-  loadMeta(); document.documentElement.lang = meta.lang;
+  loadMeta();
   PL.listeners.push(() => {});
   bindInput(); renderMenu();
   PL.loadingStop();
