@@ -9,7 +9,8 @@ const FPS = 30;
 const SCENES = [{ lv: 1, v: 'calm', sec: 4.5 }, { lv: 8, v: 'whale', sec: 4.5 }, { lv: 11, v: 'raiders', sec: 4 }];
 (async () => {
   const b = await chromium.launch();
-  for (const [w, h, name, title] of [[1920, 1080, 'preview-landscape', 150], [1080, 1920, 'preview-portrait', 120]]) {
+  const only = process.argv[2]; // isteğe bağlı: landscape | portrait
+  for (const [w, h, name, title] of [[1920, 1080, 'preview-landscape', 150], [1080, 1620, 'preview-portrait', 120]].filter(x => !only || x[2].endsWith(only))) {
     const dir = path.join(ROOT, 'promo', 'frames-' + name); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
     const p = await b.newPage({ viewport: { width: w, height: h } });
     await p.route(/crazygames/, r => r.abort());
