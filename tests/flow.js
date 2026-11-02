@@ -33,6 +33,10 @@ const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (w
     await p.goto(URL); await p.waitForTimeout(400);
     let calls = await p.evaluate(() => window.__calls.slice());
     check(calls[0] === 'init' && calls.includes('loadingStart') && calls.includes('loadingStop'), 'SDK başlatma ve yükleme olayları', calls.join(','));
+    await p.keyboard.press('Shift+D'); await p.waitForTimeout(50);
+    const diag = await p.evaluate(() => { const d = document.getElementById('diag'); return d ? d.textContent : ''; });
+    check(/environment: crazygames/.test(diag) && /loadingStop/.test(diag), 'Shift+D tanı paneli SDK durumunu gösteriyor');
+    await p.keyboard.press('Shift+D');
     await p.screenshot({ path: path.join(OUT, 'menu-landscape.png') });
     await p.click('.screen:not([hidden]) [data-act=play]'); await p.waitForTimeout(300);
     check(await p.evaluate(() => window.__calls.at(-1) === 'gameplayStart'), 'Seviye başında gameplayStart');
@@ -95,10 +99,28 @@ const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (w
     await p.evaluate(() => { window.__adFail = true; });
     await p.click('.screen:not([hidden]) [data-act=double]'); await p.waitForTimeout(200);
     check(await p.evaluate(() => SS.Game.state === 'clear' && !document.getElementById('toast').hidden), 'Reklam gelmezse oyun sürüyor ve uyarı çıkıyor');
+    check(!(await p.$('.screen:not([hidden]) [data-act=double]')), 'Reklam gelmeyince ödüllü düğmeler o oturumda gizleniyor');
+    await p.click('.screen:not([hidden]) [data-act=toShop]');
+    check(!(await p.$('.screen:not([hidden]) [data-act=freeTorp]')), 'Dükkânda da ödüllü düğme gizli');
+    check(await p.evaluate(() => SS.Platform.lastAdError === 'no fill'), 'Reklam hatasının nedeni kaydediliyor (konsol)');
     const ext = reqs.filter(u => !/crazygames\.com/.test(u));
     check(!ext.length, 'Dış istek yok (yalnızca CrazyGames SDK)', ext.slice(0, 3).join(' '));
     check(!(await p.$('a[href^="http"]')), 'Dış bağlantı yok');
     check(!errs.length, 'Sayfa hatası yok', errs.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+  /* 1b. SDK başlatma hata verirse ya da ortam 'disabled' derse: çağrılar yine gider, oyun çalışır */
+  for (const mode of ['throw', 'disabled']) {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 } }); const p = await ctx.newPage();
+    const errs = []; p.on('pageerror', e => errs.push(e.message));
+    await p.route(/crazygames\.com/, r => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
+    await p.addInitScript(MOCK);
+    await p.addInitScript(mode => { const S = window.CrazyGames.SDK; if (mode === 'throw') S.init = async () => { throw new Error('init failed'); }; else S.environment = 'disabled'; }, mode);
+    await p.goto(URL); await p.waitForTimeout(300);
+    await p.click('.screen:not([hidden]) [data-act=play]'); await p.waitForTimeout(100);
+    await endLevel(p, true); await p.click('.screen:not([hidden]) [data-act=double]'); await p.waitForTimeout(150);
+    const c = await p.evaluate(() => window.__calls.slice());
+    check(c.includes('gameplayStart') && c.includes('ad:rewarded') && !errs.length, `SDK ${mode === 'throw' ? 'başlatma hatasında' : '"disabled" ortamında'} da oyun olayları ve reklam isteği gönderiliyor`, c.join(','));
     await ctx.close();
   }
   /* 2. SDK yokken (yerel önizleme, reklam engelleyici) ve yabancı dilde tarayıcı: oyun her zaman İngilizce */
@@ -113,8 +135,8 @@ const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (w
       await p.screenshot({ path: path.join(OUT, 'menu-portrait.png') });
       await p.click('.screen:not([hidden]) [data-act=play]'); await p.waitForTimeout(2600);
       await p.screenshot({ path: path.join(OUT, 'play-portrait.png') });
-      await endLevel(p, true); await p.click('.screen:not([hidden]) [data-act=double]'); await p.waitForTimeout(150);
-      check(await p.evaluate(() => SS.Game.state === 'clear'), 'SDK yokken reklam düğmesi oyunu kilitlemiyor');
+      await endLevel(p, true);
+      check(!(await p.$('.screen:not([hidden]) [data-act=double]')) && await p.evaluate(() => SS.Game.state === 'clear'), 'SDK yokken ödüllü reklam düğmeleri gizli');
       await p.click('.screen:not([hidden]) [data-act=toShop]'); await p.click('.screen:not([hidden]) [data-act=next]'); await p.waitForTimeout(200);
       check(await p.evaluate(() => SS.Game.state === 'play' && SS.Game.run.level === 2), 'SDK yokken seviye geçişi');
     }

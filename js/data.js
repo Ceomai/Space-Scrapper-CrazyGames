@@ -95,7 +95,7 @@ SS.TEXT = {
     buy: 'Buy', owned: 'Ready', skip: 'Continue', double: 'Watch ad: double this level\'s cash',
     failed: 'Quota missed', needed: 'Needed', retry: 'Watch ad: retry this level', gameOver: 'Game over', newBest: 'New best!',
     runSummary: 'Run summary', reached: 'Reached level', total: 'Total scrap value', parts: 'Parts earned', partsShort: 'Parts', playAgain: 'Play again',
-    adBreak: 'Short break…', adFail: 'No ad available right now. Try again later.', garageHint: 'Permanent upgrades, paid with Parts from every run.',
+    adBreak: 'Short break…', adFail: 'Ads aren\'t available right now.', garageHint: 'Permanent upgrades, paid with Parts from every run.',
     max: 'MAX', freeTorp: 'Watch ad: +1 torpedo', zone: 'Zone', loading: 'Loading…',
     lv: n => `Lv ${n}`,
     zoneNames: {}, // filled from SS.ZONES

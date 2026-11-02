@@ -390,20 +390,20 @@ function renderGarage() {
 function renderClear() {
   const g = G, t = T();
   $('clear').innerHTML = `<h2>${t.levelClear}</h2><p class="big-num">+${money(g.earned)}</p><p class="muted">${t.target}: ${money(g.target)} · ${t.cash}: ${money(R.cash)}</p>
-    <div class="col">${R.doubled === g.lv ? '' : btn('▶ ' + t.double, 'double', 'reward')}${btn(t.continue, 'toShop', 'primary big')}</div>`;
+    <div class="col">${R.doubled === g.lv || !PL.canReward() ? '' : btn('▶ ' + t.double, 'double', 'reward')}${btn(t.continue, 'toShop', 'primary big')}</div>`;
   show('clear');
 }
 function renderShop() {
   const t = T();
   $('shop').innerHTML = `<h2>${t.shop}</h2><p class="muted">${t.shopHint}</p><p class="parts">${t.cash}: ${money(R.cash)} · ${t.torpedo}: ${R.torps}</p>
     <div class="list">${R.offers.map((o, i) => { const [n, d] = t.boosts[o.id]; return `<div class="item"><div><b>${n}</b><span>${d}</span></div>${o.bought ? `<em>${t.owned}</em>` : btn(money(o.price), 'buy', 'sm', R.cash < o.price, `data-i="${i}"`)}</div>`; }).join('')}</div>
-    <div class="col">${R.freeTorpUsed ? '' : btn('▶ ' + t.freeTorp, 'freeTorp', 'reward')}${btn(`${t.next}: ${t.lv(R.level + 1)} · ${t.target} ${money(SS.targetFor(R.level + 1))}`, 'next', 'primary big')}</div>`;
+    <div class="col">${R.freeTorpUsed || !PL.canReward() ? '' : btn('▶ ' + t.freeTorp, 'freeTorp', 'reward')}${btn(`${t.next}: ${t.lv(R.level + 1)} · ${t.target} ${money(SS.targetFor(R.level + 1))}`, 'next', 'primary big')}</div>`;
   show('shop');
 }
 function renderOver(res) {
   const g = G, t = T();
   $('over').innerHTML = `<h2>${t.failed}</h2><p class="muted">${t.needed}: ${money(g.target)} · ${t.earned}: ${money(g.earned)}</p>
-    <div class="col">${R.retried ? '' : btn('▶ ' + t.retry, 'retry', 'reward')}${btn(t.gameOver + ' →', 'endRun', 'primary big')}</div>`;
+    <div class="col">${R.retried || !PL.canReward() ? '' : btn('▶ ' + t.retry, 'retry', 'reward')}${btn(t.gameOver + ' →', 'endRun', 'primary big')}</div>`;
   show('over');
 }
 function renderSummary(r) {
@@ -463,6 +463,7 @@ function bindInput() {
       else if (e.code === 'ArrowUp' || e.code === 'KeyT' || e.code === 'KeyW') { e.preventDefault(); torp(); }
       else if (e.code === 'Escape' || e.code === 'KeyP') { e.preventDefault(); setPaused(!paused); }
     }
+    if (e.code === 'KeyD' && e.shiftKey) { e.preventDefault(); toggleDiag(); }
   });
   // portals: never scroll the page with game keys
   window.addEventListener('keydown', e => { if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); }, { passive: false });
@@ -471,6 +472,17 @@ function bindInput() {
   window.addEventListener('resize', () => { if (G) { const L = fitCanvas(); G.ctx = L.ctx; G.s = L.s; } else if (state === 'menu') drawLogo(); });
   window.addEventListener('contextmenu', e => e.preventDefault());
 }
+// Shift+D: SDK diagnostics (environment, init result, every call and ad error)
+function toggleDiag() {
+  let el = $('diag');
+  if (el) { el.remove(); return; }
+  el = document.createElement('pre'); el.id = 'diag';
+  el.textContent = `SDK diagnostics (Shift+D to close)\nenvironment: ${PL.env}\ninit error: ${PL.initError || '-'}\nrewarded available: ${PL.canReward()}\nlast ad error: ${JSON.stringify(PL.lastAdError)}\n\n${PL.log.join('\n')}`;
+  Object.assign(el.style, { position: 'fixed', inset: '10px', zIndex: 99, margin: 0, padding: '12px', overflow: 'auto', background: '#000d', color: '#9f9', font: '12px/1.4 monospace', whiteSpace: 'pre-wrap', borderRadius: '8px' });
+  el.addEventListener('click', () => el.remove());
+  document.body.appendChild(el);
+}
+SS.toggleDiag = toggleDiag;
 SS.onAdStart = () => { if (state === 'play' && !paused) setPaused(true); };
 SS.onAdEnd = () => {};
 
@@ -487,7 +499,6 @@ function frame(now) {
 
 /* ---------- boot ---------- */
 SS.boot = async () => {
-  PL.loadingStart && PL.loadingStart();
   await PL.init();
   PL.loadingStart();
   loadMeta();
