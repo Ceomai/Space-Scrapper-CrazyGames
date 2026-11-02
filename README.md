@@ -36,11 +36,10 @@ Check the current requirements before submitting: https://docs.crazygames.com/
 ## Upload to CrazyGames
 
 1. **Developer portal:** create an account at https://developer.crazygames.com.
-2. **Build:** download the zip `space-scrapper-crazygames.zip` from https://github.com/Ceomai/Space-Scrapper-CrazyGames/releases/download/paket/space-scrapper-crazygames.zip (rebuilt by GitHub Actions on every update). To build it locally:
-   ```bash
-   zip -r space-scrapper-crazygames.zip index.html js icons
-   ```
-3. **Upload:** upload it as an HTML5 game. Cover images are in `promo/` (1920×1080, 800×1200, 800×800); regenerate them with `node tools/promo.js`.
+2. **Build:** the CrazyGames uploader takes files, not archives or folders, so the game is also built as **one self-contained `index.html`** (all scripts and the icon embedded, ~110 KB):
+   https://github.com/Ceomai/Space-Scrapper-CrazyGames/releases/download/paket/index.html
+   Rebuilt by GitHub Actions on every update and tested with the same flow test. Build locally with `node tools/build-single.js` (→ `dist/index.html`). The multi-file zip is still in the same release.
+3. **Upload:** drag that single `index.html` into the upload zone as an HTML5 game. Cover images are in `promo/` (1920×1080, 800×1200, 800×800); regenerate them with `node tools/promo.js`.
 4. **Launch:** the game goes through review and *Basic Launch*; with good playtime and retention it can move to *Full Launch*.
 
 ## Tests

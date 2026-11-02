@@ -25,22 +25,27 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Testler
         run: node tests/run.js
-      - name: CrazyGames paketi
+      - name: CrazyGames paketi (tek dosya + zip)
         run: |
-          mkdir -p dist
+          node tools/build-single.js
+          GAME_URL="file://$PWD/dist/index.html" node tests/flow.js
           zip -r dist/space-scrapper-crazygames.zip index.html js icons -x '*.DS_Store'
           ls -la dist
       - uses: actions/upload-artifact@v4
         with:
           name: space-scrapper-crazygames
-          path: dist/space-scrapper-crazygames.zip
+          path: |
+            dist/index.html
+            dist/space-scrapper-crazygames.zip
       - name: Sürüm sayfası (sabit indirme linki)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: paket
           name: Space Scrapper · CrazyGames paketi
-          body: "CrazyGames'e yüklenecek paket. Her main güncellemesinde yenilenir. Commit: ${{ github.sha }}"
-          files: dist/space-scrapper-crazygames.zip
+          body: "CrazyGames'e yüklemek için index.html (her şey tek dosyada) ya da zip. Her main güncellemesinde yenilenir. Commit: ${{ github.sha }}"
+          files: |
+            dist/index.html
+            dist/space-scrapper-crazygames.zip
           make_latest: true
       - name: Önizleme (gh-pages)
         run: |

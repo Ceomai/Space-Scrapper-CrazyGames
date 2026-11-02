@@ -2,7 +2,7 @@
 // SDK'sız çalışma, iki dil, yeniden yükleme ve ekran görüntüleri.
 const { chromium } = require('playwright');
 const path = require('path'), fs = require('fs');
-const URL = 'file://' + path.resolve(__dirname, '../index.html');
+const URL = process.env.GAME_URL || 'file://' + path.resolve(__dirname, '../index.html');
 const OUT = path.join(__dirname, 'out'); fs.mkdirSync(OUT, { recursive: true });
 const MOCK = () => {
   window.__calls = []; window.__store = window.__store || JSON.parse(sessionStorage.getItem('mockStore') || '{}');
