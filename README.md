@@ -2,7 +2,7 @@
 
 Swing your claw, grab space scrap, beat the quota. A short-session arcade game made for web game portals (CrazyGames), built from the scrap-hunt mechanic of [Space Scrapper](https://github.com/Ceomai/Space_Scrapper).
 
-Pure HTML5 canvas + JavaScript. No framework, no build step, no external assets except the CrazyGames SDK. The package is ~1 MB.
+Pure HTML5 canvas + JavaScript. No framework, no build step, no external assets except the CrazyGames SDK. The upload package is ~240 KB.
 
 ## Oyun (Türkçe özet)
 
