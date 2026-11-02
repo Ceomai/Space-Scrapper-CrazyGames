@@ -1,0 +1,44 @@
+# Testleri çalıştırır ve CrazyGames'e yüklenecek zip paketini üretir (Actions → çalıştırma → Artifacts).
+# İsteğe bağlı önizleme: gh-pages dalına yazar (Settings → Pages → Deploy from a branch → gh-pages / root).
+name: Test ve paket
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Playwright kur
+        run: |
+          npm install --no-save --no-package-lock playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Testler
+        run: node tests/run.js
+      - name: CrazyGames paketi
+        run: |
+          mkdir -p dist
+          zip -r dist/space-scrapper-crazygames.zip index.html js icons -x '*.DS_Store'
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: space-scrapper-crazygames
+          path: dist/space-scrapper-crazygames.zip
+      - name: Önizleme (gh-pages)
+        run: |
+          mkdir -p _site && cp -r index.html js icons _site/ && touch _site/.nojekyll
+          cd _site && git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "Önizleme: ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
