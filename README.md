@@ -36,7 +36,7 @@ Check the current requirements before submitting: https://docs.crazygames.com/
 ## Upload to CrazyGames
 
 1. **Developer portal:** create an account at https://developer.crazygames.com.
-2. **Build:** the zip `space-scrapper-crazygames.zip` is produced by GitHub Actions (Actions → latest run → Artifacts). To build it locally:
+2. **Build:** download the zip `space-scrapper-crazygames.zip` from https://github.com/Ceomai/Space-Scrapper-CrazyGames/releases/download/paket/space-scrapper-crazygames.zip (rebuilt by GitHub Actions on every update). To build it locally:
    ```bash
    zip -r space-scrapper-crazygames.zip index.html js icons
    ```

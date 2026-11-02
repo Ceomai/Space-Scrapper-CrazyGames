@@ -34,6 +34,14 @@ jobs:
         with:
           name: space-scrapper-crazygames
           path: dist/space-scrapper-crazygames.zip
+      - name: Sürüm sayfası (sabit indirme linki)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: paket
+          name: Space Scrapper · CrazyGames paketi
+          body: "CrazyGames'e yüklenecek paket. Her main güncellemesinde yenilenir. Commit: ${{ github.sha }}"
+          files: dist/space-scrapper-crazygames.zip
+          make_latest: true
       - name: Önizleme (gh-pages)
         run: |
           mkdir -p _site && cp -r index.html js icons _site/ && touch _site/.nojekyll
