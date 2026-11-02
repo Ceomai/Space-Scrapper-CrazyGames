@@ -314,7 +314,7 @@ function draw(g) {
 let state = 'menu', paused = false;
 SS.Game = { get state() { return state; }, get paused() { return paused; }, get run() { return R; }, _dbg: () => G, _fire: () => fire(), _torp: () => torp(), _tip: g => tip(g), _value: (g, k) => valueOf(g, k),
   // tests only: step the level manually (the real loop then only draws)
-  manual: false, _step: dt => { if (G && state === 'play' && !paused) update(G, dt); } };
+  manual: false, _step: dt => { if (G && state === 'play' && !paused) update(G, dt); }, _draw: () => { if (G) draw(G); } };
 const show = id => { document.querySelectorAll('.screen').forEach(s => { s.hidden = s.id !== id; }); $('hud').hidden = !(id === null); document.body.dataset.state = state; };
 function startRun() {
   SS.audioUnlock();
