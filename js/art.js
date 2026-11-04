@@ -216,10 +216,12 @@ Art.item = (c, it, t, P) => {
     case 'rock': case 'boulder': rockShape(c, it, P); break;
     case 'crystal': gem(c, x, y, r, P.crystal, P.crystal2, t + (it.seed || 0)); break;
     case 'box': c.save(); c.translate(x, y); c.rotate((it.rot || 0) * .5);
-      c.fillStyle = P.boxD; c.fillRect(-r, -r * .8 + 3, r * 2, r * 1.6);
-      c.fillStyle = P.box; c.fillRect(-r, -r * .8, r * 2, r * 1.6);
-      c.fillStyle = P.ui; for (let i = -r; i < r; i += 8) { c.beginPath(); c.moveTo(i, -r * .8); c.lineTo(i + 4, -r * .8); c.lineTo(i + 1, -r * .8 + 5); c.lineTo(i - 3, -r * .8 + 5); c.fill(); }
-      c.fillStyle = P.ui; c.font = `bold ${r * 1.1}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('?', 0, 3);
+      // uçuş kaydedicisi: koyu gövde, turuncu ikaz bantları, yanıp sönen bulucu ışık
+      c.fillStyle = '#0d0b1a'; c.beginPath(); c.roundRect ? c.roundRect(-r, -r * .75 + 3, r * 2, r * 1.5, 4) : c.rect(-r, -r * .75 + 3, r * 2, r * 1.5); c.fill();
+      c.fillStyle = '#2a2440'; c.beginPath(); c.roundRect ? c.roundRect(-r, -r * .75, r * 2, r * 1.5, 4) : c.rect(-r, -r * .75, r * 2, r * 1.5); c.fill();
+      c.fillStyle = P.box; c.fillRect(-r, -r * .75 + 4, r * 2, 4); c.fillRect(-r, r * .75 - 8, r * 2, 4);
+      c.fillStyle = P.metal; c.fillRect(-r * .45, -2, r * .9, 5);
+      c.fillStyle = Math.sin(t * 6 + (it.seed || 0)) > 0 ? P.bad : '#5a1430'; c.beginPath(); c.arc(r * .62, -r * .4, 2.6, 0, Math.PI * 2); c.fill();
       c.restore();
       if (it.radar) { c.save(); c.globalAlpha = .9; c.fillStyle = P.ui; c.fillRect(x - 13, y - r - 22, 26, 16); c.fillStyle = P.accent; c.font = 'bold 10px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(it.radar, x, y - r - 14); c.restore(); }
       break;

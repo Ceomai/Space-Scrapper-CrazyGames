@@ -1,19 +1,22 @@
 # Space Scrapper · CrazyGames edition
 
-Swing your claw, grab space scrap, beat the quota. A short-session arcade game made for web game portals (CrazyGames), built from the scrap-hunt mechanic of [Space Scrapper](https://github.com/Ceomai/Space_Scrapper).
+Aim your claw, fill salvage orders for picky clients, keep your rusty ship in one piece. A short-session arcade game made for web game portals (CrazyGames), built from the scrap-hunt mechanic of [Space Scrapper](https://github.com/Ceomai/Space_Scrapper).
 
 Pure HTML5 canvas + JavaScript. No framework, no build step, no external assets except the CrazyGames SDK. The upload package is ~240 KB.
 
 ## Oyun (Türkçe özet)
 
-- **Tur:** Her seviyede ~45 saniye. Kancayı doğru açıda at, hurdayı çek, **kotayı** doldur.
-- **Bölgeler:** 5 bölge (Asteroit Kuşağı → Gemi Mezarlığı → Gaz Devi → Korsan Sektörü → Kayıp Yıldız), her biri 3 seviye. İkinci turdan itibaren bütün bölgeler zenginleşir.
-- **Saha koşulları:** Her seviyede biri gelir: sakin, güneş akıntısı, karanlık bölge, meteor yağmuru, yılan yuvası, balina göçü, korsan dronları, zengin damar, buz kuşağı, yuva.
-- **Tehlikeler:** patlayıcı tanklar, ısıran taklitçi kutular, parlayan denizanaları. Kara kutulardan para, torpido, süre, güçlü vinç ya da kristal çıkar.
-- **Dükkân (seviye arası):** torpido ve tek seviyelik destekler: kanca yağı, enerji içeceği, zaman kapsülü, şans yoncası, mücevher cilası, radar.
-- **Garaj (kalıcı):** her turdan kazanılan parçalarla 6 yükseltme: kanca motoru, vinç, mıknatıs, oksijen tankı, torpido rafı, tarayıcı.
-- **Dil:** yalnızca İngilizce (tarayıcı dili ne olursa olsun); tarayıcının otomatik çevirisi kapalı.
-- **Kontroller:** dokun / tıkla / Boşluk / ↓ = kancayı at; Torpido düğmesi / ↑ / T = çekilen yükü patlat; Esc / P = duraklat.
+- **Nişan al ve at:** Kanca sallanmaz; fareyle (ya da ←/→) nişan alınır, tıklayınca (ya da Boşluk) nişanlanan yöne fırlar. Kesikli nişan çizgisi kancanın ilk değeceği eşyayı gösterir; siparişe uyan eşya yeşil ✓ ile işaretlenir.
+- **Dalış ve siparişler:** Her dalışta (35–60 sn) müşterilerden 3 sipariş gelir: "3 × Cıvata Yığını", "1 × Enerji Kristali", "₡300 değerinde Metal" gibi. Tamamlanan her sipariş ★ ve prim verir.
+- **Gövde:** 3 can. Bir dalışta yeterli sipariş tamamlanmazsa (dalış 2–3: 1, 4–9: 2, sonrası: 3) gemi hasar alır. Can bitince koşu biter.
+- **Modül seçimi (dalış arası):** 3 karttan biri seçilir; koşu boyunca sürer (hızlı motor, ağır vinç, mıknatıs bobini, oksijen, komisyoncu, kaya geri dönüşümü, şok kaplama, derin tarayıcı, sıralama zinciri).
+- **Bırak:** Tutulan istenmeyen yük sağ tık / ↑ / Bırak düğmesiyle bırakılır.
+- **Bölgeler ve saha koşulları:** 5 bölge; sakin, güneş rüzgârı, karanlık, meteor yağmuru, yılanlar, balina, korsan dronları, altın akını, buz alanı, yuva.
+- **Öğretim:** İlk dalış oynanış içinde, görsel ve atlanabilir (Skip tutorial); bir kez gösterilir.
+- **Garaj (kalıcı):** parçalarla 6 yükseltme: kanca motoru, vinç, mıknatıs, oksijen tankı, gövde kaplaması, ticaret lisansı.
+- **Ses:** sentezlenmiş efektler ve prosedürel müzik (ayrı açılıp kapanır, SDK sessiz ayarına uyar).
+- **Dil:** yalnızca İngilizce; tarayıcının otomatik çevirisi kapalı.
+- **Kontroller:** fare/dokunma = nişan ve atış; ←/→ (A/D) nişan; Boşluk/↓/S atış; ↑/W/sağ tık bırak; P duraklat. Escape kullanılmaz (tarayıcıda tam ekrandan çıkar). Tuşlar fiziksel konumla okunur, AZERTY'de de çalışır.
 
 ## CrazyGames integration (SDK v3)
 
@@ -21,13 +24,13 @@ Pure HTML5 canvas + JavaScript. No framework, no build step, no external assets 
 |---|---|
 | SDK script | `<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js">` in `index.html`; `SDK.init()` before anything else |
 | Loading events | `loadingStart` / `loadingStop` around boot |
-| Gameplay events | `gameplayStart` when a level runs or resumes; `gameplayStop` on pause, tab switch, level end, menus, ads |
-| Midgame ads | Natural break only: at the start of level 3, then at most every second level. Game is paused and muted during ads |
-| Rewarded ads (opt-in) | Double a level's cash (once per level) · +1 torpedo in the shop (once per visit) · retry a failed level (once per run) |
+| Gameplay events | `gameplayStart` when a dive runs or resumes; `gameplayStop` on pause, tab switch, dive end, menus, ads |
+| Midgame ads | Natural break only: at the start of dive 3, then at most every second dive. Game is paused and muted during ads |
+| Rewarded ads (opt-in) | Double a dive's cash (once per dive) · new module cards (once per pick) · repair the hull after a failed dive (once per run) |
 | Ad failure / ad blocker | Game never freezes; a short notice is shown; 45 s safety timeout |
-| Happy time | Called when a level is cleared with 1.5× the quota |
+| Happy time | Called when all three orders of a dive are filled |
 | Save | CrazyGames data module (`SDK.data`) with `localStorage` fallback. Only game progress, no personal data |
-| Audio | Respects the SDK's `muteAudio` setting; in-game sound toggle |
+| Audio | Respects the SDK's `muteAudio` setting; separate sound and music toggles; audio starts only after the first click/key |
 | Other ads / links | None. No external requests besides the SDK |
 | Without SDK | Runs everywhere (local preview, other hosts): ads resolve as "not shown", events are no-ops |
 
@@ -53,6 +56,6 @@ node tests/run.js
 | File | What it checks |
 |---|---|
 | `tests/flow.js` | All screens with a mocked CrazyGames SDK: loading and gameplay events, midgame ad timing, three rewarded ads, ad failure, data-module save and reload, mute setting, no external requests or links, no-SDK mode, English-only check (Turkish and German browsers, every screen, all 10 field conditions, every box/event/item text drawn on the canvas), layout on 7 screen sizes (overflow, tap targets ≥ 36 px, playfield fills the screen) |
-| `tests/balance.js` | Balance bot plays whole runs (perfect or human-like aim) with 0 / mid / max garage, portrait and landscape |
+| `tests/balance.js` | Aim bot plays whole runs ("good" = exact aim, orders first; "human" = aim error, reaction delay, sometimes ignores orders) with 0 / mid garage, landscape and portrait; fails if the human profile averages fewer than 5 or more than 60 dives |
 
-Measured with the human-like bot (3 runs each): no garage ≈ level 8, mid garage ≈ level 10, full garage ≈ level 12; portrait and landscape within ±1 level. Filling the whole garage takes ≈ 12 runs.
+Measured (`node tests/balance.js 2`): without garage ≈ 10–15 dives, with a mid garage ≈ 13–21 dives, landscape and portrait within a few dives. Real players are slower than the bot, so a first run usually ends around dive 6–10.

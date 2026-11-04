@@ -19,7 +19,9 @@ const MOCK = () => {
 let failed = 0; const report = [];
 const SS_TEXT_CHECK = keys => Object.fromEntries(keys.map(k => [k, 1]));
 const check = (ok, name, info = '') => { if (!ok) failed++; report.push(`${ok ? '✓' : '✗'} ${name}${info ? ' · ' + info : ''}`); };
-const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (win) { g.earned = g.target; SS.Game.run.cash += g.target; SS.Game.run.total += g.target; } g.time = .01; SS.Game.manual = true; for (let i = 0; i < 80 && SS.Game.state === 'play'; i++) SS.Game._step(1 / 30); SS.Game.manual = false; return SS.Game.state; }, win);
+// Dalışı bitir: win = bütün siparişler tamam, değilse hiçbiri; durum döner (result / wrecked)
+const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(), R = SS.Game.run; if (win) for (const o of g.orders) if (!o.done) { o.done = true; o.got = o.n; g.earned += o.reward; R.cash += o.reward; R.total += o.reward; R.stars++; } g.time = .01; SS.Game.manual = true; for (let i = 0; i < 80 && SS.Game.state === 'play'; i++) SS.Game._step(1 / 30); SS.Game.manual = false; return SS.Game.state; }, win);
+const nextDive = async p => { await p.click('.screen:not([hidden]) [data-act=toPick]'); await p.waitForTimeout(60); await p.click('.screen:not([hidden]) .card'); await p.waitForTimeout(250); };
 
 (async () => {
   const b = await chromium.launch();
@@ -39,69 +41,86 @@ const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (w
     await p.keyboard.press('Shift+D');
     await p.screenshot({ path: path.join(OUT, 'menu-landscape.png') });
     await p.click('.screen:not([hidden]) [data-act=play]'); await p.waitForTimeout(300);
-    check(await p.evaluate(() => window.__calls.at(-1) === 'gameplayStart'), 'Seviye başında gameplayStart');
-    await p.click('#hud [data-act=pause]'); await p.waitForTimeout(100);
-    check(await p.evaluate(() => SS.Game.paused && window.__calls.at(-1) === 'gameplayStop'), 'Duraklatmada gameplayStop');
+    check(await p.evaluate(() => window.__calls.at(-1) === 'gameplayStart'), 'Dalış başında gameplayStart');
+    // öğretim: ilk dalışta, oynanış içinde, atlanabilir
+    let tut = await p.evaluate(() => ({ on: !!SS.Game._dbg().tut, skip: !document.getElementById('skipTut').hidden, orders: document.querySelectorAll('#orders .order').length }));
+    check(tut.on && tut.skip && tut.orders === 3, 'İlk dalış öğretimle açılıyor, "Skip tutorial" görünür, 3 sipariş var', JSON.stringify(tut));
+    await p.waitForTimeout(600); await p.screenshot({ path: path.join(OUT, 'tutorial.png') });
+    // fareyle nişan + tıklayınca atış; nişan çizgisinin gösterdiği eşya tutulur
+    const aimRes = await p.evaluate(() => { const g = SS.Game._dbg(), t = g.tut.target, r = document.getElementById('game').getBoundingClientRect(); return { x: r.left + t.x / g.W * r.width, y: r.top + t.y / g.H * r.height, kind: t.kind }; });
+    await p.mouse.move(aimRes.x, aimRes.y); await p.waitForTimeout(100);
+    check(await p.evaluate(() => { const g = SS.Game._dbg(); return SS.Game._aimHit(g, g.aim).it === g.tut.target && g.tut.step === 1; }), 'Fareyle nişan alınca öğretim "Fire" adımına geçiyor');
+    await p.mouse.down(); await p.mouse.up();
+    await p.waitForFunction(() => SS.Game._dbg().hook.held || SS.Game._dbg().got > 0, null, { timeout: 5000 }).catch(() => {});
+    check(await p.evaluate(k => { const g = SS.Game._dbg(); return (g.hook.held && g.hook.held.kind === k) || g.got > 0; }, aimRes.kind), 'Tıklayınca kanca nişanlanan eşyayı tutuyor');
+    // sağ tık: tutulan yükü bırak
+    const dropped = await p.evaluate(() => { const g = SS.Game._dbg(); if (!g.hook.held) return 'yok'; const n = g.items.length; const c = document.getElementById('game'), r = c.getBoundingClientRect(); c.dispatchEvent(new PointerEvent('pointerdown', { button: 2, clientX: r.left + 10, clientY: r.top + r.height - 10, bubbles: true })); return g.items.length === n + 1 && !g.hook.held; });
+    check(dropped === true || dropped === 'yok', 'Sağ tıkla tutulan yük bırakılıyor', String(dropped));
+    await p.click('#skipTut'); await p.waitForTimeout(80);
+    check(await p.evaluate(() => !SS.Game._dbg().tut && SS.meta.tut && document.getElementById('skipTut').hidden), 'Öğretim atlanıyor ve bir daha gösterilmiyor');
+    // tuşlar: P duraklatır, Escape oyunda kullanılmıyor (tarayıcıda tam ekrandan çıkar)
+    await p.keyboard.press('Escape'); await p.waitForTimeout(60);
+    check(await p.evaluate(() => !SS.Game.paused), 'Escape oyunu duraklatmıyor (kısıtlı tuş)');
+    await p.keyboard.press('KeyP'); await p.waitForTimeout(60);
+    check(await p.evaluate(() => SS.Game.paused && window.__calls.at(-1) === 'gameplayStop'), 'P ile duraklatma ve gameplayStop');
     await p.screenshot({ path: path.join(OUT, 'pause.png') });
     await p.click('.screen:not([hidden]) [data-act=resume]'); await p.waitForTimeout(100);
     check(await p.evaluate(() => !SS.Game.paused && window.__calls.at(-1) === 'gameplayStart'), 'Devamda gameplayStart');
-    await p.waitForTimeout(2500); await p.screenshot({ path: path.join(OUT, 'play-landscape.png') });
-    check(await endLevel(p, true) === 'clear', 'Kota tutunca seviye tamam ekranı');
-    await p.screenshot({ path: path.join(OUT, 'clear.png') });
+    const a0 = await p.evaluate(() => SS.Game._dbg().aim); await p.keyboard.down('ArrowRight'); await p.waitForTimeout(250); await p.keyboard.up('ArrowRight');
+    check(await p.evaluate(a0 => SS.Game._dbg().aim > a0, a0), 'Ok tuşlarıyla nişan');
+    await p.waitForTimeout(1500); await p.screenshot({ path: path.join(OUT, 'play-landscape.png') });
+    check(await endLevel(p, true) === 'result', 'Dalış sonu ekranı (yıldızlar ve siparişler)');
+    await p.screenshot({ path: path.join(OUT, 'result.png') });
     const before = await p.evaluate(() => SS.Game.run.cash);
     await p.click('.screen:not([hidden]) [data-act=double]'); await p.waitForTimeout(200);
     const after = await p.evaluate(() => ({ cash: SS.Game.run.cash, last: window.__calls.filter(c => c.startsWith('ad')).at(-1) }));
-    check(after.cash > before && after.last === 'ad:rewarded', 'Ödüllü reklam: seviye parası ikiye katlandı', `${before} → ${after.cash}`);
-    check(!(await p.$('.screen:not([hidden]) [data-act=double]')), 'İkiye katlama aynı seviyede bir kez');
-    await p.click('.screen:not([hidden]) [data-act=toShop]'); await p.waitForTimeout(100);
-    await p.screenshot({ path: path.join(OUT, 'shop.png') });
-    const t0 = await p.evaluate(() => SS.Game.run.torps);
-    await p.click('.screen:not([hidden]) [data-act=freeTorp]'); await p.waitForTimeout(200);
-    check(await p.evaluate(t0 => SS.Game.run.torps === t0 + 1, t0), 'Ödüllü reklam: +1 torpido');
-    const buyable = await p.$('.screen:not([hidden]) [data-act=buy]:not([disabled])');
-    if (buyable) { await buyable.click(); await p.waitForTimeout(80); }
-    check(await p.evaluate(() => SS.Game.run.offers.some(o => o.bought)), 'Dükkândan alışveriş');
-    // seviye 2 → 3 geçişinde seviye arası reklam
-    await p.click('.screen:not([hidden]) [data-act=next]'); await p.waitForTimeout(250);
-    let mid = await p.evaluate(() => window.__calls.filter(c => c === 'ad:midgame').length);
-    check(mid === 0, 'Seviye 2\'de seviye arası reklam yok');
-    await endLevel(p, true); await p.click('.screen:not([hidden]) [data-act=toShop]'); await p.click('.screen:not([hidden]) [data-act=next]'); await p.waitForTimeout(300);
-    mid = await p.evaluate(() => ({ n: window.__calls.filter(c => c === 'ad:midgame').length, lv: SS.Game.run.level, st: SS.Game.state }));
-    check(mid.n === 1 && mid.lv === 3 && mid.st === 'play', 'Seviye 3 başında bir seviye arası reklam', JSON.stringify(mid));
-    await endLevel(p, true); await p.click('.screen:not([hidden]) [data-act=toShop]'); await p.click('.screen:not([hidden]) [data-act=next]'); await p.waitForTimeout(300);
+    check(after.cash > before && after.last === 'ad:rewarded', 'Ödüllü reklam: dalış parası ikiye katlandı', `${before} → ${after.cash}`);
+    check(!(await p.$('.screen:not([hidden]) [data-act=double]')), 'İkiye katlama aynı dalışta bir kez');
+    await p.click('.screen:not([hidden]) [data-act=toPick]'); await p.waitForTimeout(100);
+    await p.screenshot({ path: path.join(OUT, 'pick.png') });
+    const o0 = await p.evaluate(() => SS.Game.run.offers.join());
+    await p.click('.screen:not([hidden]) [data-act=reroll]'); await p.waitForTimeout(200);
+    check(await p.evaluate(() => SS.Game.run.rerolled && !document.querySelector('.screen:not([hidden]) [data-act=reroll]')), 'Ödüllü reklam: modül kartlarını yenileme (bir kez)', o0 + ' → ' + await p.evaluate(() => SS.Game.run.offers.join()));
+    await p.click('.screen:not([hidden]) .card'); await p.waitForTimeout(250);
+    let mid = await p.evaluate(() => ({ n: window.__calls.filter(c => c === 'ad:midgame').length, mods: Object.keys(SS.Game.run.mods).length }));
+    check(mid.n === 0 && mid.mods === 1, 'Modül seçildi; 2. dalışta seviye arası reklam yok', JSON.stringify(mid));
+    await endLevel(p, true); await nextDive(p);
+    mid = await p.evaluate(() => ({ n: window.__calls.filter(c => c === 'ad:midgame').length, d: SS.Game.run.dive, st: SS.Game.state }));
+    check(mid.n === 1 && mid.d === 3 && mid.st === 'play', '3. dalış başında bir seviye arası reklam', JSON.stringify(mid));
+    await endLevel(p, true); await nextDive(p);
     mid = await p.evaluate(() => window.__calls.filter(c => c === 'ad:midgame').length);
-    check(mid === 1, 'Seviye 4\'te yeni reklam yok (en fazla iki seviyede bir)');
-    // başarısızlık → tekrar dene (ödüllü) → başarısızlık → özet
-    check(await endLevel(p, false) === 'over', 'Kota tutmayınca başarısızlık ekranı');
-    await p.screenshot({ path: path.join(OUT, 'failed.png') });
-    await p.click('.screen:not([hidden]) [data-act=retry]'); await p.waitForTimeout(250);
-    check(await p.evaluate(() => SS.Game.state === 'play' && SS.Game.run.retried && SS.Game.run.level === 4), 'Ödüllü reklamla aynı seviyeyi tekrar deneme');
-    await endLevel(p, false);
-    check(!(await p.$('.screen:not([hidden]) [data-act=retry]')), 'Tekrar deneme turda bir kez');
+    check(mid === 1, '4. dalışta yeni reklam yok (en fazla iki dalışta bir)');
+    // siparişsiz dalış → gövde hasarı; ödüllü onarım bir kez; can bitince enkaz → özet
+    const h0 = await p.evaluate(() => SS.Game.run.hearts);
+    check(await endLevel(p, false) === 'result' && await p.evaluate(h0 => SS.Game.run.hearts === h0 - 1, h0), 'Sipariş yoksa gövde hasarı (−1 can)');
+    await p.screenshot({ path: path.join(OUT, 'hull-hit.png') });
+    await p.click('.screen:not([hidden]) [data-act=repair]'); await p.waitForTimeout(200);
+    check(await p.evaluate(h0 => SS.Game.run.hearts === h0 && SS.Game.run.repaired, h0), 'Ödüllü reklamla gövde onarımı');
+    for (let i = 0; i < 6 && await p.evaluate(() => SS.Game.state !== 'wrecked'); i++) { await nextDive(p); await endLevel(p, false); }
+    check(await p.evaluate(() => SS.Game.state === 'wrecked') && !(await p.$('.screen:not([hidden]) [data-act=repair]')), 'Can bitince enkaz ekranı; onarım koşuda bir kez');
     await p.click('.screen:not([hidden]) [data-act=endRun]'); await p.waitForTimeout(100);
     await p.screenshot({ path: path.join(OUT, 'summary.png') });
     const meta = await p.evaluate(() => ({ parts: SS.meta.parts, best: SS.meta.best, saved: window.__calls.includes('data:set') }));
-    check(meta.parts > 0 && meta.best > 0 && meta.saved, 'Tur sonu: parça, rekor ve SDK veri modülüne kayıt', JSON.stringify(meta));
+    check(meta.parts > 0 && meta.best > 0 && meta.saved, 'Koşu sonu: parça, rekor ve SDK veri modülüne kayıt', JSON.stringify(meta));
     await p.click('.screen:not([hidden]) [data-act=garage]'); await p.waitForTimeout(80);
     const up = await p.$('.screen:not([hidden]) [data-act=up]:not([disabled])'); if (up) { await up.click(); await p.waitForTimeout(80); }
     await p.screenshot({ path: path.join(OUT, 'garage.png') });
     const upSum = await p.evaluate(() => Object.values(SS.meta.up).reduce((a, b) => a + b, 0));
     check(upSum >= 1, 'Garajda kalıcı yükseltme', `toplam seviye ${upSum}`);
-    // yeniden yükleme: kayıt SDK veri modülünden geri gelmeli
     await p.reload(); await p.waitForTimeout(400);
-    const back = await p.evaluate(() => ({ parts: SS.meta.parts, up: Object.values(SS.meta.up).reduce((a, b) => a + b, 0) }));
-    check(back.up === upSum, 'Yeniden açılışta garaj ve parçalar korunuyor', JSON.stringify(back));
-    // ses ayarı SDK'dan
+    const back = await p.evaluate(() => ({ parts: SS.meta.parts, up: Object.values(SS.meta.up).reduce((a, b) => a + b, 0), tut: SS.meta.tut }));
+    check(back.up === upSum && back.tut, 'Yeniden açılışta garaj, parçalar ve öğretim durumu korunuyor', JSON.stringify(back));
     await p.evaluate(() => window.__settings && window.__settings({ muteAudio: true }));
     check(await p.evaluate(() => SS.Platform.muted === true), 'SDK sessiz ayarı uygulanıyor');
-    // reklam hatası: oyun takılmaz, uyarı gösterir
-    await p.click('.screen:not([hidden]) [data-act=play]'); await endLevel(p, true);
+    await p.click('.screen:not([hidden]) [data-act=play]'); await p.waitForTimeout(100);
+    check(await p.evaluate(() => !SS.Game._dbg().tut && document.getElementById('skipTut').hidden), 'İkinci koşuda öğretim yok');
+    await endLevel(p, true);
     await p.evaluate(() => { window.__adFail = true; });
     await p.click('.screen:not([hidden]) [data-act=double]'); await p.waitForTimeout(200);
-    check(await p.evaluate(() => SS.Game.state === 'clear' && !document.getElementById('toast').hidden), 'Reklam gelmezse oyun sürüyor ve uyarı çıkıyor');
+    check(await p.evaluate(() => SS.Game.state === 'result' && !document.getElementById('toast').hidden), 'Reklam gelmezse oyun sürüyor ve uyarı çıkıyor');
     check(!(await p.$('.screen:not([hidden]) [data-act=double]')), 'Reklam gelmeyince ödüllü düğmeler o oturumda gizleniyor');
-    await p.click('.screen:not([hidden]) [data-act=toShop]');
-    check(!(await p.$('.screen:not([hidden]) [data-act=freeTorp]')), 'Dükkânda da ödüllü düğme gizli');
+    await p.click('.screen:not([hidden]) [data-act=toPick]');
+    check(!(await p.$('.screen:not([hidden]) [data-act=reroll]')), 'Modül ekranında da ödüllü düğme gizli');
     check(await p.evaluate(() => SS.Platform.lastAdError === 'no fill'), 'Reklam hatasının nedeni kaydediliyor (konsol)');
     const ext = reqs.filter(u => !/crazygames\.com/.test(u));
     check(!ext.length, 'Dış istek yok (yalnızca CrazyGames SDK)', ext.slice(0, 3).join(' '));
@@ -118,7 +137,7 @@ const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (w
     await p.addInitScript(mode => { const S = window.CrazyGames.SDK; if (mode === 'throw') S.init = async () => { throw new Error('init failed'); }; else S.environment = 'disabled'; }, mode);
     await p.goto(URL); await p.waitForTimeout(300);
     await p.click('.screen:not([hidden]) [data-act=play]'); await p.waitForTimeout(100);
-    await endLevel(p, true); await p.click('.screen:not([hidden]) [data-act=double]'); await p.waitForTimeout(150);
+    await p.click('#skipTut').catch(() => {}); await endLevel(p, true); await p.click('.screen:not([hidden]) [data-act=double]'); await p.waitForTimeout(150);
     const c = await p.evaluate(() => window.__calls.slice());
     check(c.includes('gameplayStart') && c.includes('ad:rewarded') && !errs.length, `SDK ${mode === 'throw' ? 'başlatma hatasında' : '"disabled" ortamında'} da oyun olayları ve reklam isteği gönderiliyor`, c.join(','));
     await ctx.close();
@@ -130,15 +149,15 @@ const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (w
     await p.route(/crazygames\.com/, r => r.abort());
     await p.goto(URL); await p.waitForTimeout(400);
     const ui = await p.evaluate(() => ({ play: document.querySelector('#menu [data-act=play]').textContent, lang: document.documentElement.lang, tr: document.documentElement.getAttribute('translate'), langBtn: !!document.querySelector('[data-act=lang]') }));
-    check(ui.play === 'Play' && ui.lang === 'en' && ui.tr === 'no' && !ui.langBtn, `${locale} tarayıcıda oyun İngilizce, otomatik çeviri kapalı, dil düğmesi yok`, JSON.stringify(ui));
+    check(/^(▶ )?Play$/.test(ui.play) && ui.lang === 'en' && ui.tr === 'no' && !ui.langBtn, `${locale} tarayıcıda oyun İngilizce, otomatik çeviri kapalı, dil düğmesi yok`, JSON.stringify(ui));
     if (locale === 'tr-TR') {
       await p.screenshot({ path: path.join(OUT, 'menu-portrait.png') });
       await p.click('.screen:not([hidden]) [data-act=play]'); await p.waitForTimeout(2600);
       await p.screenshot({ path: path.join(OUT, 'play-portrait.png') });
       await endLevel(p, true);
-      check(!(await p.$('.screen:not([hidden]) [data-act=double]')) && await p.evaluate(() => SS.Game.state === 'clear'), 'SDK yokken ödüllü reklam düğmeleri gizli');
-      await p.click('.screen:not([hidden]) [data-act=toShop]'); await p.click('.screen:not([hidden]) [data-act=next]'); await p.waitForTimeout(200);
-      check(await p.evaluate(() => SS.Game.state === 'play' && SS.Game.run.level === 2), 'SDK yokken seviye geçişi');
+      check(!(await p.$('.screen:not([hidden]) [data-act=double]')) && await p.evaluate(() => SS.Game.state === 'result'), 'SDK yokken ödüllü reklam düğmeleri gizli');
+      await nextDive(p);
+      check(await p.evaluate(() => SS.Game.state === 'play' && SS.Game.run.dive === 2), 'SDK yokken dalış geçişi');
     }
     check(!errs.length, `${locale}: sayfa hatası yok`, errs.slice(0, 3).join(' | '));
     await ctx.close();
@@ -165,20 +184,22 @@ const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (w
     await p.evaluate(() => {
       // bütün kutu sonuçları ve olay mesajları
       const g = SS.Game._dbg(), t = SS.TEXT.en;
-      for (const k of Object.keys(t.boxes)) SS.FX.text(g.fx, 10, 10, t.boxes[k]); for (const k of Object.keys(t.events)) SS.FX.text(g.fx, 10, 10, t.events[k]);
+      for (const k of Object.keys(t.events)) SS.FX.text(g.fx, 10, 10, t.events[k]);
       for (const k of Object.keys(t.items)) SS.FX.text(g.fx, 10, 10, '+1', null, t.items[k]);
       SS.Game.manual = true; SS.Game._step(1 / 60);
     });
     await p.waitForTimeout(80); await grab();
-    await endLevel(p, true); await grab(); await p.click('.screen:not([hidden]) [data-act=toShop]'); await grab();
-    await p.evaluate(() => { SS.Game.run.offers = ['torp', 'oil', 'strength', 'time', 'clover', 'polish', 'radar'].map(id => ({ id, price: 1, bought: false })); SS.ACT.toShop(); SS.Game.run.offers = ['torp', 'oil', 'strength', 'time', 'clover', 'polish', 'radar'].map(id => ({ id, price: 1, bought: false })); });
-    await p.evaluate(() => { document.getElementById('shop').innerHTML = ''; }); await p.evaluate(() => SS.ACT.next()); await p.waitForTimeout(100);
+    await endLevel(p, true); await grab(); await p.click('.screen:not([hidden]) [data-act=toPick]'); await grab();
+    // bütün modül kartları
+    await p.click('.screen:not([hidden]) .card'); await p.waitForTimeout(100);
     await p.evaluate(() => SS.ACT.pause()); await grab(); await p.evaluate(() => SS.ACT.resume());
-    await endLevel(p, false); await grab(); await p.click('.screen:not([hidden]) [data-act=endRun]'); await grab();
-    const all = [...texts, ...await p.evaluate(() => [...window.__canvasText]), ...await p.evaluate(() => JSON.stringify(SS.TEXT).match(/"([^"\\]|\\.)*"/g).map(s => JSON.parse(s)))];
-    const TR_CHARS = /[çğıöşüÇĞİÖŞÜ]/, TR_WORDS = /\b(ve|bir|için|seviye|hurda|kanca|torpido|oyna|garaj|devam|reklam|süre|para|parça|bölge|kota)\b/i;
+    await endLevel(p, false); await grab();
+    for (let i = 0; i < 6 && await p.evaluate(() => SS.Game.state !== 'wrecked'); i++) { await nextDive(p); await endLevel(p, false); } await grab();
+    await p.click('.screen:not([hidden]) [data-act=endRun]'); await grab();
+    const all = [...texts, ...await p.evaluate(() => [...window.__canvasText]), ...await p.evaluate(() => JSON.stringify([SS.TEXT, SS.MODS, SS.CATS, SS.ITEMS]).match(/"([^"\\]|\\.)*"/g).map(s => JSON.parse(s)))];
+    const TR_CHARS = /[çğıöşüÇĞİÖŞÜ]/, TR_WORDS = /\b(ve|bir|için|seviye|hurda|kanca|torpido|oyna|garaj|devam|reklam|süre|para|parça|bölge|kota|sipariş|dalış)\b/i;
     const bad = [...new Set(all)].filter(s => TR_CHARS.test(s) || TR_WORDS.test(s));
-    check(!bad.length && all.length > 150, `Bütün metinler İngilizce (${new Set(all).size} farklı metin tarandı: ekranlar, 10 saha koşulu, kutular, olaylar, eşyalar, dükkân, garaj)`, bad.slice(0, 6).join(' | '));
+    check(!bad.length && all.length > 150, `Bütün metinler İngilizce (${new Set(all).size} farklı metin tarandı: ekranlar, 10 saha koşulu, olaylar, eşyalar, siparişler, modüller, garaj)`, bad.slice(0, 6).join(' | '));
     check(!('tr' in SS_TEXT_CHECK(await p.evaluate(() => Object.keys(SS.TEXT)))), 'Oyunda yalnızca İngilizce metin seti var');
     check(!errs.length, 'Dil denetiminde sayfa hatası yok', errs.slice(0, 3).join(' | '));
     await ctx.close();
@@ -190,10 +211,10 @@ const endLevel = (p, win) => p.evaluate(win => { const g = SS.Game._dbg(); if (w
     await p.route(/crazygames\.com/, r => r.abort());
     await p.goto(URL); await p.waitForTimeout(300);
     const bad = [];
-    for (const step of ['menu', 'play', 'clear', 'shop', 'garage']) {
+    for (const step of ['menu', 'play', 'result', 'pick', 'garage']) {
       if (step === 'play') { await p.click('.screen:not([hidden]) [data-act=play]'); await p.waitForTimeout(200); }
-      if (step === 'clear') await endLevel(p, true);
-      if (step === 'shop') await p.click('.screen:not([hidden]) [data-act=toShop]');
+      if (step === 'result') await endLevel(p, true);
+      if (step === 'pick') await p.click('.screen:not([hidden]) [data-act=toPick]');
       if (step === 'garage') { await p.evaluate(() => SS.ACT.garage()); }
       await p.waitForTimeout(80);
       const r = await p.evaluate(() => {

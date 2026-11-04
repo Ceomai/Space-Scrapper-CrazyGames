@@ -46,7 +46,7 @@ SS.ITEMS = {
   rock:    { name: 'Small Asteroid',     r: 16, val: 12,  wt: 2.6 },
   boulder: { name: 'Giant Asteroid',       r: 30, val: 35,  wt: 5.2 },
   crystal: { name: 'Energy Crystal',    r: 11, val: 320, wt: 1,   gem: 1 },
-  box:     { name: 'Black Box',          r: 16, val: 0,   wt: 1.5 },
+  box:     { name: 'Flight Recorder',    r: 16, val: 150, wt: 1.5 },
   bug:     { name: 'Space Bug',        r: 12, val: 25,  wt: 1,   move: 1 },
   slime:   { name: 'Crystal Slime',  r: 16, val: 340, wt: 1.3, move: 1, gem: 1 },
   tank:    { name: 'Explosive Tank',     r: 15, val: 0,   wt: 1 },
@@ -56,7 +56,7 @@ SS.ITEMS = {
   jelly:   { name: 'Nebula Jelly',  r: 15, val: 170, wt: .8 },
   egg:     { name: 'Alien Egg',   r: 13, val: 260, wt: 1.4, gem: 1 },
   amber:   { name: 'Whale Amber',      r: 12, val: 420, wt: 1,   gem: 1 },
-  mimic:   { name: 'Mimic Box',      r: 16, val: 0,   wt: 1.5 },
+  mimic:   { name: 'Mimic Recorder', r: 16, val: 0,   wt: 1.5 },
 };
 SS.ZONES = [
   { id: 'belt',   name: 'Asteroid Belt',  mult: 1,
@@ -85,33 +85,51 @@ SS.VARIANTS = [
   { id: 'nursery', w: { belt: 0, yard: 0, gas: 3, pirate: 0, lost: 2 }, mix: m => { m.jelly = (m.jelly || 0) + 3; m.egg = (m.egg || 0) + 2; m.slime = Math.max(0, (m.slime || 0) - 1); } },
 ];
 
+/* ---------- order categories: what a client can ask for by value ---------- */
+SS.CATS = {
+  metal:   { name: 'Metal', kinds: ['bolts', 'plate', 'sat', 'part', 'debris'] },
+  mineral: { name: 'Minerals', kinds: ['rock', 'boulder', 'gold', 'ice'] },
+  bio:     { name: 'Rare finds', kinds: ['crystal', 'slime', 'egg', 'jelly', 'amber', 'bug'] },
+};
+SS.catOf = kind => Object.keys(SS.CATS).find(c => SS.CATS[c].kinds.includes(kind)) || null;
+/* ---------- run modules: one of three is picked after every dive ---------- */
+SS.MODS = [
+  { id: 'motor',    max: 3, icon: '⇣', name: 'Overdrive Motor', desc: 'Claw shoots 20% faster' },
+  { id: 'winch',    max: 3, icon: '⟲', name: 'Heavy Winch',     desc: 'Reel in 25% faster' },
+  { id: 'coil',     max: 3, icon: '◎', name: 'Magnet Coil',     desc: 'Wider grab reach' },
+  { id: 'oxygen',   max: 3, icon: '◷', name: 'Oxygen Reserve',  desc: '+6 seconds every dive' },
+  { id: 'broker',   max: 3, icon: '★', name: 'Salvage Broker',  desc: 'Orders pay 20% more' },
+  { id: 'recycler', max: 2, icon: '♻', name: 'Rock Recycler',   desc: 'Minerals are worth 60% more' },
+  { id: 'plating',  max: 1, icon: '⛨', name: 'Shock Plating',   desc: 'Jellies, mimics and eels can\'t stop you' },
+  { id: 'scanner',  max: 1, icon: '⌖', name: 'Deep Scanner',    desc: 'See values while aiming, wider light in dark zones' },
+  { id: 'chain',    max: 1, icon: '⛓', name: 'Sorting Chain',   desc: 'Same-category catches in a row: +10% each, up to +50%' },
+];
+
 /* ---------- texts: the CrazyGames edition is English only ---------- */
 SS.TEXT = {
   en: {
-    play: 'Play', garage: 'Garage', continue: 'Continue', back: 'Back', level: 'Level', target: 'Target', time: 'Time', cash: 'Cash', best: 'Best',
-    tapHint: 'Tap, click or press Space to fire the claw', torpHint: 'Torpedo blows up what you are dragging',
-    torpedo: 'Torpedo', paused: 'Paused', resume: 'Resume', quit: 'Main menu', sound: 'Sound', on: 'On', off: 'Off',
-    levelClear: 'Level cleared!', earned: 'Earned', next: 'Next level', shop: 'Space Shop', shopHint: 'Boosts last for the next level only.',
-    buy: 'Buy', owned: 'Ready', skip: 'Continue', double: 'Watch ad: double this level\'s cash',
-    failed: 'Quota missed', needed: 'Needed', retry: 'Watch ad: retry this level', gameOver: 'Game over', newBest: 'New best!',
-    runSummary: 'Run summary', reached: 'Reached level', total: 'Total scrap value', parts: 'Parts earned', partsShort: 'Parts', playAgain: 'Play again',
-    adBreak: 'Short break…', adFail: 'Ads aren\'t available right now.', garageHint: 'Permanent upgrades, paid with Parts from every run.',
-    max: 'MAX', freeTorp: 'Watch ad: +1 torpedo', zone: 'Zone', loading: 'Loading…',
-    lv: n => `Lv ${n}`,
-    zoneNames: {}, // filled from SS.ZONES
-    var: { calm: ['Calm Field', 'Quiet space today. Take your time.'], drift: ['Solar Wind', 'Everything drifts sideways. Aim ahead of your target.'],
-      dark: ['Dark Sector', 'Only the area around your claw is lit. Gems still glimmer.'], storm: ['Meteor Shower', 'Red arrows warn of meteors. A hit cuts your rope.'],
-      eels: ['Space Eels', 'Eels push your claw away and steal your haul. Wait for them to pass.'], whale: ['Whale Crossing', 'A space whale swims by and drops precious amber.'],
-      raiders: ['Pirate Drones', 'Drones steal valuables. Knock them down with your claw.'], rich: ['Gold Rush', 'Gold rocks everywhere, but more explosive tanks too.'],
+    play: 'Play', garage: 'Garage', continue: 'Continue', back: 'Back', best: 'Best', cash: 'Cash', sound: 'Sound', music: 'Music', on: 'On', off: 'Off',
+    paused: 'Paused', resume: 'Resume', quit: 'Main menu', loading: 'Loading…', max: 'MAX', partsShort: 'Parts',
+    dive: n => `Dive ${n}`, orders: 'Orders', drop: 'Drop',
+    tagline: 'Aim the claw, fill salvage orders, keep your ship in one piece.',
+    tut: { aim: 'Aim at the bolts', fire: 'Fire!', orders: 'Fill orders for bonus cash', skip: 'Skip tutorial', drop: 'Grabbed junk? Drop it' },
+    keys: { aim: 'Mouse  or  ← →', fire: 'Click  or  Space', drop: 'Right-click  or  ↑' },
+    diveDone: 'Dive complete', hullHit: 'Hull damaged', wrecked: 'Ship wrecked', need: n => `Fill at least ${n} order${n > 1 ? 's' : ''} to avoid hull damage`,
+    earned: 'Earned', double: 'Watch ad: double this dive\'s cash', repair: 'Watch ad: repair the hull', reroll: 'Watch ad: new modules',
+    pick: 'Pick a module', pickHint: 'Modules last for this run.', next: n => `Next: Dive ${n}`,
+    runSummary: 'Run summary', newBest: 'New best!', reached: 'Dives', total: 'Total cash', starsT: 'Orders filled', parts: 'Parts earned', playAgain: 'Play again',
+    adFail: 'Ads aren\'t available right now.', garageHint: 'Permanent upgrades, paid with Parts from every run.',
+    order: { kind: (n, name) => `${n} × ${name}`, cat: (v, name) => `₡${v} of ${name}` },
+    zoneNames: {},
+    var: { calm: ['Calm Field', 'Quiet space today.'], drift: ['Solar Wind', 'Everything drifts sideways. Aim ahead.'],
+      dark: ['Dark Sector', 'Only the area around your claw is lit.'], storm: ['Meteor Shower', 'Red arrows warn of meteors. A hit cuts your rope.'],
+      eels: ['Space Eels', 'Eels push your claw away and steal your haul.'], whale: ['Whale Crossing', 'A space whale drops precious amber.'],
+      raiders: ['Pirate Drones', 'Drones steal valuables. Hit them with your claw.'], rich: ['Gold Rush', 'Gold everywhere, but more explosive tanks too.'],
       frozen: ['Ice Field', 'Comet ice is light and quick to reel in.'], nursery: ['Alien Nursery', 'Don\'t touch glowing jellies. Eggs are worth a lot.'] },
-    boxes: { cash: 'Cash!', torp: '+1 Torpedo', time: '+5 seconds', strength: 'Power reel!', crystal: 'Crystal inside!', trap: 'Confetti!' },
-    events: { boom: 'BOOM!', mimic: 'Mimic bite! −4s', jelly: 'Zapped! −3s', meteor: 'Meteor cut the rope!', eelPush: 'Eel pushed the claw', eelSnatch: 'Eel snatched it!', droneDown: 'Drone down!', droneSteal: 'Drone stole it!', amber: 'The whale dropped amber!' },
+    events: { boom: 'BOOM!', mimic: 'Mimic bite! −4s', jelly: 'Zapped! −3s', meteor: 'Meteor cut the rope!', eelPush: 'Eel pushed the claw', eelSnatch: 'Eel snatched it!', droneDown: 'Drone down!', droneSteal: 'Drone stole it!', amber: 'The whale dropped amber!', orderDone: 'Order filled!', dropped: 'Dropped' },
     items: {},
-    boosts: { torp: ['Torpedo', '+1 torpedo for this run'], oil: ['Claw Oil', 'Claw shoots 40% faster next level'], strength: ['Power Drink', 'Reel in 50% faster next level'],
-      time: ['Time Capsule', '+10 seconds next level'], clover: ['Lucky Clover', 'Black boxes give better loot next level'], polish: ['Gem Polish', 'Gems are worth double next level'],
-      radar: ['Radar Scan', 'See black box contents and mimics next level'] },
-    ups: { claw: ['Claw Motor', 'Faster claw shot'], winch: ['Winch', 'Reel heavy loot faster'], magnet: ['Magnet', 'Bigger grab reach'], time: ['Oxygen Tank', '+4 seconds every level'],
-      torp: ['Torpedo Rack', '+1 starting torpedo'], luck: ['Scanner', 'Better black box loot'] },
+    ups: { claw: ['Claw Motor', 'Faster claw shot'], winch: ['Winch', 'Reel heavy loot faster'], magnet: ['Magnet', 'Bigger grab reach'], time: ['Oxygen Tank', '+4 seconds every dive'],
+      hull: ['Hull Plating', '+1 starting hull point'], broker: ['Trade License', 'Orders pay 8% more'] },
   }
 };
 for (const z of SS.ZONES) SS.TEXT.en.zoneNames[z.id] = z.name; for (const k in SS.ITEMS) SS.TEXT.en.items[k] = SS.ITEMS[k].name;
